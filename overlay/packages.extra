@@ -1,0 +1,9 @@
+# Extra packages appended to upstream's archiso/packages_desktop.x86_64.
+# One package per line; '#' comments and blank lines are ignored.
+#
+# Headers for every kernel in upstream's list (linux-cachyos, linux-cachyos-lts, ...)
+# are added automatically by build.sh, so DKMS can build bcachefs for each of them.
+# The headers, bcachefs-dkms and the compiler toolchain they pull in are removed
+# again by overlay/customize_airootfs.sh after the module is built.
+
+bcachefs-dkms

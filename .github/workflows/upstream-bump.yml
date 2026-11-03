@@ -1,0 +1,45 @@
+# Weekly: if CachyOS-Live-ISO has new commits, open a PR bumping the submodule.
+# The ISO itself is built locally (see README) — this only tracks upstream.
+name: Bump upstream
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - id: bump
+        run: |
+          old=$(git -C upstream rev-parse HEAD)
+          git submodule update --init --remote upstream
+          new=$(git -C upstream rev-parse HEAD)
+          if [ "$old" != "$new" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "old=${old:0:7}" >> "$GITHUB_OUTPUT"
+            echo "new=${new:0:7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.bump.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: bump-upstream
+          delete-branch: true
+          commit-message: "Bump upstream ${{ steps.bump.outputs.old }}..${{ steps.bump.outputs.new }}"
+          title: "Bump upstream to ${{ steps.bump.outputs.new }}"
+          body: |
+            CachyOS-Live-ISO changes: https://github.com/CachyOS/CachyOS-Live-ISO/compare/${{ steps.bump.outputs.old }}...${{ steps.bump.outputs.new }}
+
+            Before merging: check the diff touches nothing the overlay relies on
+            (`archiso/packages_desktop.x86_64`, `buildiso.sh` flags, output paths),
+            then build locally with `./build.sh`.
