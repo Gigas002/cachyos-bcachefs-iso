@@ -106,6 +106,26 @@ Options:
 - `./build.sh -v` and any other arguments are passed to upstream `buildiso.sh`
   (`-v` verbose log, `-r` build in RAM if you have more than 23 GB of RAM).
 
+## Publishing a release
+
+```sh
+./release.sh            # newest out/*-bcachefs.iso → GitHub release tagged <YYMMDD>
+```
+
+GitHub release files are limited to 2 GiB, so `release.sh` splits the ISO into parts
+smaller than that. It uploads them together with `.parts.sha256`, `.iso.sha256` and
+the package list, and writes the release notes (kernel and bcachefs versions, upstream
+commit). Requires `gh auth login`.
+
+Downloading a release:
+
+```sh
+sha256sum -c *.parts.sha256
+iso=$(basename *.iso.sha256 .sha256)
+cat "$iso".part* > "$iso"
+sha256sum -c "$iso.sha256"
+```
+
 ## Testing in a VM
 
 `run_archiso` comes with `archiso`:
