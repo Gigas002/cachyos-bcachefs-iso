@@ -109,13 +109,16 @@ Options:
 ## Publishing a release
 
 ```sh
-./release.sh            # newest out/*-bcachefs.iso → GitHub release tagged <YYMMDD>
+./release.sh            # newest out/*-bcachefs.iso → release linux-cachyos-<ver>_bcachefs-<ver>
 ```
 
 GitHub release files are limited to 2 GiB, so `release.sh` splits the ISO into parts
 smaller than that. It uploads them together with `.parts.sha256`, `.iso.sha256` and
 the package list, and writes the release notes (kernel and bcachefs versions, upstream
-commit). Requires `gh auth login`.
+commit). The release tag and title are `linux-cachyos-<ver>_bcachefs-<ver>` (for example
+`linux-cachyos-7.2.7_bcachefs-1.39.7`), without the package epoch/release. If neither
+version changed since the last release, the script refuses to run. Delete the old
+release first if you want to replace it. Requires `gh auth login`.
 
 Downloading a release:
 
