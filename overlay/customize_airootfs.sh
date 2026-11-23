@@ -27,6 +27,33 @@ verify() {
     return "$rc"
 }
 
+# Known build breakages of the released bcachefs-dkms, fixed here and rebuilt
+# for the affected kernels only. Each fix applies only where it's needed.
+#
+# inode_state helpers: bcachefs defines them for kernels < 6.19, but stable
+# kernels got them backported (6.18.64 LTS), so they're defined twice. Drop
+# bcachefs's copies for a kernel whose headers already have them.
+fix_and_rebuild() {
+    local kver src ver fsh
+    src=$(find /usr/src -maxdepth 1 -name 'bcachefs-*' -print -quit)
+    [[ -n $src ]] || return 0
+    ver=${src##*/bcachefs-}
+    fsh=$src/src/fs/bcachefs/vfs/fs.h
+    for kver in "${kernels[@]}"; do
+        modinfo -k "$kver" -F filename bcachefs &>/dev/null && continue
+        if grep -q 'inode_state_set_raw' "/usr/lib/modules/$kver/build/include/linux/fs.h" 2>/dev/null &&
+            grep -q '^static inline void inode_state_set_raw' "$fsh" 2>/dev/null; then
+            echo "bcachefs-iso: $kver has the inode_state helpers, rebuilding without bcachefs's copies"
+            cp "$fsh" "$fsh.orig"
+            sed -i '/^#if LINUX_VERSION_CODE < KERNEL_VERSION(6,19,0)$/{N;/inode_state_read(struct inode \*inode)/s/^#if .*\n/#if 0\n/}' "$fsh"
+            dkms install "bcachefs/$ver" -k "$kver" || true
+            mv "$fsh.orig" "$fsh"
+        fi
+    done
+}
+
+fix_and_rebuild
+
 echo "bcachefs-iso: verifying DKMS build"
 verify
 

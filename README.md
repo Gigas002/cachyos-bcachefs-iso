@@ -223,6 +223,15 @@ To go back to a known-good upstream commit: `git -C upstream checkout <commit>`,
 Usually a brand-new kernel that the released `bcachefs-dkms` doesn't support yet.
 Scroll up for the DKMS error (or rerun with `-v` and check the log). Options:
 
+Known breakages are fixed by `customize_airootfs.sh`, which rebuilds the module for the
+affected kernel only:
+
+- `redefinition of 'inode_state_set_raw'`: stable kernels got the 6.19 inode_state
+  helpers backported (6.18.64 LTS), and bcachefs 1.39.7 defines them for every kernel
+  before 6.19. Its copies are dropped for kernels whose headers have them.
+
+Otherwise:
+
 - wait a few days for a `bcachefs-dkms` update and rebuild, or
 - switch to the git version: in `overlay/packages.extra`, replace `bcachefs-dkms` with
   `bcachefs-dkms-git`. If the git module needs matching git tools, add
