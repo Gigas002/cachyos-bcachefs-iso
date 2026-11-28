@@ -1,0 +1,59 @@
+# Packages removed from upstream's archiso/packages_desktop.x86_64 for the minimal
+# (console only) ISO: the desktop, its apps and fonts, the graphical installers, and
+# the NVIDIA kernels and drivers (the live console doesn't need them; the installer
+# installs drivers into the new system with chwd).
+# One package per line; '#' comments and blank lines are ignored. A name that is no
+# longer in upstream's list is reported by build.sh, so this list stays current.
+
+# Plasma desktop and its parts
+bluedevil
+breeze-gtk
+cachyos-kde-settings
+kde-gtk-config
+kinfocenter
+kscreen
+kxkb2locale1
+plasma-desktop
+plasma-integration
+plasma-login-manager
+plasma-nm
+plasma-pa
+plasma-thunderbolt
+plasma-workspace
+polkit-kde-agent
+xdg-user-dirs-gtk
+libwnck3
+
+# Graphical applications
+alacritty
+dolphin
+firefox
+gparted
+kate
+kcalc
+konsole
+occt
+orca
+partitionmanager
+spectacle
+imwheel
+spice-vdagent
+
+# Installers: cachyinstall replaces them
+cachyos-calamares
+cachyos-cli-installer-new
+cachyos-hello
+
+# Fonts (the console uses its own)
+noto-fonts
+noto-fonts-cjk
+opendesktop-fonts
+ttf-bitstream-vera
+ttf-dejavu
+ttf-liberation
+ttf-opensans
+
+# NVIDIA kernels and driver
+linux-cachyos-nvidia-open
+linux-cachyos-lts-nvidia-open
+nvidia-utils
