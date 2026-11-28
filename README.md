@@ -156,9 +156,10 @@ Both ISOs go into one release; they must have the same kernel and bcachefs versi
 smaller than that. It uploads them together with `.parts.sha256`, `.iso.sha256` and
 the package list, and writes the release notes (kernel and bcachefs versions, upstream
 commit). The release tag and title are `linux-cachyos-<ver>_bcachefs-<ver>` (for example
-`linux-cachyos-7.2.7_bcachefs-1.39.7`), without the package epoch/release. If neither
-version changed since the last release, the script refuses to run. Delete the old
-release first if you want to replace it. Requires `gh auth login`.
+`linux-cachyos-7.2.7_bcachefs-1.39.7`), without the package epoch/release. If a release
+with those versions already exists, the build date is appended
+(`linux-cachyos-7.3.5_bcachefs-1.39.7-261128`); the script refuses to run only when that
+release exists too. Requires `gh auth login`.
 
 Downloading a release:
 

@@ -4,6 +4,7 @@
 #
 #   ./release.sh              release the newest out/cachyos-{desktop,minimal}-*-bcachefs.iso
 #                             (whichever exist) as tag/title linux-cachyos-<ver>_bcachefs-<ver>
+#                             (plus -<build date> when that release already exists)
 #   ./release.sh a.iso b.iso  release specific ones
 set -euo pipefail
 
@@ -37,7 +38,12 @@ for iso in "${isos[@]}"; do
     [[ -z $tag || $tag == "$t" ]] || die "the ISOs have different versions ($tag, $t): release them separately"
     tag=$t
 done
-gh release view "$tag" &>/dev/null && die "release $tag already exists"
+if gh release view "$tag" &>/dev/null; then
+    # A rebuild with the same kernel and bcachefs versions gets its build date appended.
+    built="$(grep -oE '[0-9]{6}' <<<"$(basename "${isos[0]}")" | tail -1)"
+    tag="$tag-$built"
+    gh release view "$tag" &>/dev/null && die "release $tag already exists"
+fi
 
 rel="$repo/out/release-$tag"
 rm -rf "$rel"; mkdir -p "$rel"
