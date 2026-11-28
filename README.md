@@ -14,6 +14,22 @@ bcachefs system. This repo fixes only that, and stays as close to upstream as po
 - The only additions: `bcachefs.ko` for each kernel. The headers and compilers used
   to build it are removed again before the ISO is packed.
 
+Two ISOs are built from the same upstream commit:
+
+| ISO | |
+|---|---|
+| `cachyos-desktop-linux-<date>-bcachefs.iso` | the official desktop ISO (KDE Plasma, Calamares) + bcachefs |
+| `cachyos-minimal-linux-<date>-bcachefs.iso` | console only: the same live system without the desktop, its apps, fonts, graphical installers and NVIDIA kernels, with [cachyinstall](https://github.com/Gigas002/cachyinstall) on tty1 |
+
+`cachyinstall` is a terminal (TUI) installer for a minimal CachyOS: what CachyOS's
+installer sets up on a desktop install (base system, repositories for your CPU's
+x86-64 level, keyrings, `chwd` drivers, hooks, services) without any graphical package,
+bcachefs as the default root filesystem with its format options chosen at install time
+(multi-device, encryption, compression, targets), and a category picker for extra
+software, including the AUR helper and login shell. It needs a network connection
+(`nmtui` is on the welcome page). `sudo cachyinstall --demo` walks every screen without
+touching the disks.
+
 Retire this repo once bcachefs is back in the kernel. Until then, rebuild whenever you
 want a fresh ISO.
 
@@ -22,10 +38,16 @@ want a fresh ISO.
 ```
 cachyos-bcachefs-iso/
 ├── upstream/                   git submodule → CachyOS/CachyOS-Live-ISO (pinned commit)
+├── cachyinstall/               git submodule → Gigas002/cachyinstall (minimal ISO's installer)
 ├── overlay/
 │   ├── packages.extra          extra packages (bcachefs-dkms)
-│   └── customize_airootfs.sh   verify module + strip build toolchain (runs in ISO chroot)
+│   ├── customize_airootfs.sh   verify module + strip build toolchain (runs in ISO chroot)
+│   └── minimal/
+│       ├── packages.remove     GUI packages left out of the minimal ISO
+│       ├── customize_airootfs.sh  appended: boot to the console, no display manager
+│       └── airootfs/           files added to the live system (installer autostart)
 ├── build.sh                    copy upstream → apply overlay → run upstream buildiso.sh
+├── release.sh                  publish both ISOs as one GitHub release
 └── .github/workflows/
     └── upstream-bump.yml       weekly PR when upstream has new commits
 ```
@@ -41,6 +63,19 @@ cachyos-bcachefs-iso/
 3. Drops `overlay/customize_airootfs.sh` into `airootfs/root/`.
 4. Runs `./buildiso.sh -p desktop`, the same command CachyOS uses.
 
+For the minimal flavour it first builds `cachyinstall` (`cargo build --release
+--locked`, and checks that every repository package its catalog offers exists), then
+also:
+
+- removes the packages in `overlay/minimal/packages.remove` from the list. A name
+  that is no longer in upstream's list is reported as a warning;
+- appends `overlay/minimal/customize_airootfs.sh`: no display manager,
+  `multi-user.target` as the default;
+- installs the binary as `/usr/local/bin/cachyinstall` and
+  `/etc/profile.d/zz-cachyinstall.sh`, which runs `sudo cachyinstall` once when the
+  live user is logged in on tty1 (upstream's autologin). Quit it to get the shell;
+  `sudo cachyinstall` starts it again.
+
 During the archiso build, pacman's DKMS hook compiles `bcachefs.ko` for each kernel.
 Then `customize_airootfs.sh` runs inside the ISO root and:
 
@@ -51,7 +86,7 @@ Then `customize_airootfs.sh` runs inside the ISO root and:
    remove hook is masked for that step, so the built modules stay.
 3. Runs `depmod` and verifies again.
 
-The result is `out/cachyos-desktop-linux-<YYMMDD>-bcachefs.iso`.
+The results are `out/cachyos-{desktop,minimal}-linux-<YYMMDD>-bcachefs.iso`.
 
 ## Requirements
 
@@ -61,11 +96,12 @@ The result is `out/cachyos-desktop-linux-<YYMMDD>-bcachefs.iso`.
   ```sh
   sudo pacman -S --needed git archiso mkinitcpio-archiso squashfs-tools grub
   ```
+  and, for the minimal ISO, a Rust toolchain (`rust` or `rustup`).
 - Optional, for testing in a VM:
   ```sh
   sudo pacman -S --needed qemu-desktop edk2-ovmf
   ```
-- About 20 GB of free disk space in the repo directory, and `sudo` rights. `mkarchiso`
+- About 20 GB of free disk space (one flavour is built at a time) in the repo directory, and `sudo` rights. `mkarchiso`
   must run as root. Upstream's scripts call `sudo` themselves, so run `build.sh` as
   your normal user.
 - A network connection. All packages are downloaded fresh from the CachyOS/Arch repos.
@@ -79,10 +115,12 @@ The result is `out/cachyos-desktop-linux-<YYMMDD>-bcachefs.iso`.
 ```sh
 git clone --recurse-submodules https://github.com/Gigas002/cachyos-bcachefs-iso.git
 cd cachyos-bcachefs-iso
-./build.sh
+./build.sh              # both ISOs
+./build.sh desktop      # only the desktop one
+./build.sh minimal      # only the minimal one
 ```
 
-Takes roughly 30 to 60 minutes. Look for these lines in the output:
+Takes roughly 30 to 60 minutes per ISO. Look for these lines in the output:
 
 ```
 bcachefs-iso: 7.x.y-z-cachyos -> /usr/lib/modules/.../updates/dkms/bcachefs.ko.zst (...)
@@ -100,19 +138,21 @@ Output in `out/`:
 
 Options:
 
-- `KEEP_WORK=1 ./build.sh` keeps `work/` (about 15 GB) after a successful build, for
-  debugging. By default it is deleted. After a failed build it is always kept, and the
+- `KEEP_WORK=1 ./build.sh minimal` keeps `work/` (about 15 GB) after a successful build, for
+  debugging (with both flavours, only the last one's is kept). By default it is deleted. After a failed build it is always kept, and the
   next run wipes it.
-- `./build.sh -v` and any other arguments are passed to upstream `buildiso.sh`
+- `./build.sh minimal -v`: arguments after the flavour are passed to upstream `buildiso.sh`
   (`-v` verbose log, `-r` build in RAM if you have more than 23 GB of RAM).
 
 ## Publishing a release
 
 ```sh
-./release.sh            # newest out/*-bcachefs.iso → release linux-cachyos-<ver>_bcachefs-<ver>
+./release.sh            # newest desktop + minimal ISO → release linux-cachyos-<ver>_bcachefs-<ver>
+./release.sh out/a.iso  # specific ISOs
 ```
 
-GitHub release files are limited to 2 GiB, so `release.sh` splits the ISO into parts
+Both ISOs go into one release; they must have the same kernel and bcachefs versions
+(build them together). GitHub release files are limited to 2 GiB, so `release.sh` splits each ISO into parts
 smaller than that. It uploads them together with `.parts.sha256`, `.iso.sha256` and
 the package list, and writes the release notes (kernel and bcachefs versions, upstream
 commit). The release tag and title are `linux-cachyos-<ver>_bcachefs-<ver>` (for example
@@ -136,6 +176,15 @@ sha256sum -c "$iso.sha256"
 ```sh
 run_archiso -u -i out/cachyos-desktop-linux-*-bcachefs.iso   # UEFI
 run_archiso    -i out/cachyos-desktop-linux-*-bcachefs.iso   # BIOS
+```
+
+The minimal ISO starts the installer on the console. To try a real install, give the
+VM a disk (the installer is UEFI only):
+
+```sh
+qemu-img create -f qcow2 /tmp/disk.qcow2 20G
+qemu-system-x86_64 -enable-kvm -m 4G -smp 4 -bios /usr/share/edk2/x64/OVMF.4m.fd \
+  -cdrom out/cachyos-minimal-linux-*-bcachefs.iso -drive file=/tmp/disk.qcow2,if=virtio
 ```
 
 In the live system, check both kernels (the LTS one is the "fallback" boot entry):
@@ -209,6 +258,8 @@ Upstream changes that can break the overlay (`build.sh` fails early with a clear
 for most of them):
 
 - `archiso/packages_desktop.x86_64` renamed, or profile name `desktop` changed
+- `profiledef.sh` losing its `file_permissions` array, or the tty1 autologin user
+  `liveuser` renamed (minimal flavour)
 - kernel packages renamed away from `linux-cachyos*`
 - `buildiso.sh` flags or output dir (`out/desktop/`) changed
 - archiso dropping `customize_airootfs.sh` support (currently deprecated but working).

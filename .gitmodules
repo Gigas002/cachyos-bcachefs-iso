@@ -2,3 +2,6 @@
 	path = upstream
 	url = https://github.com/CachyOS/CachyOS-Live-ISO.git
 	branch = master
+[submodule "cachyinstall"]
+	path = cachyinstall
+	url = ../cachyinstall.git
