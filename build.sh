@@ -63,6 +63,14 @@ prepare() {
     pkgs="$src/archiso/packages_desktop.x86_64"
     [[ -f $pkgs ]] || die "upstream layout changed: $pkgs not found"
 
+    # Upstream's EXIT trap prints "An unknown error has occurred" on every exit, even
+    # after a successful build: report it only when the build failed (unmount either way).
+    sed -i -f - "$src/buildiso.sh" <<'SED'
+s/^trap 'trap_exit EXIT \(.*\)' EXIT$/trap 'rc=$?; if (( rc )); then trap_exit EXIT \1; else umount_fs; fi' EXIT/
+SED
+    grep -q "^trap 'rc=\$?; if (( rc ))" "$src/buildiso.sh" ||
+        die "upstream layout changed: no EXIT trap in buildiso.sh"
+
     if [[ $flavour == minimal ]]; then
         while read -r name; do
             grep -qxF "$name" "$pkgs" || warn "overlay/minimal/packages.remove: '$name' is not in upstream's list"
