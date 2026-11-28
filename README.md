@@ -280,6 +280,9 @@ affected kernel only:
 - `redefinition of 'inode_state_set_raw'`: stable kernels got the 6.19 inode_state
   helpers backported (6.18.64 LTS), and bcachefs 1.39.7 defines them for every kernel
   before 6.19. Its copies are dropped for kernels whose headers have them.
+- `cannot find function system_unbound in module kernel::workqueue`: kernel 7.3.6
+  renamed the Rust `workqueue::system_unbound()` to `system_dfl()`, which bcachefs
+  1.39.7 still calls. The new name is used for kernels whose Rust crate only has that.
 
 Otherwise:
 

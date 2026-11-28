@@ -28,27 +28,45 @@ verify() {
 }
 
 # Known build breakages of the released bcachefs-dkms, fixed here and rebuilt
-# for the affected kernels only. Each fix applies only where it's needed.
+# for the affected kernels only. Each fix applies only where its signature matches,
+# and the source is restored after each build.
 #
 # inode_state helpers: bcachefs defines them for kernels < 6.19, but stable
 # kernels got them backported (6.18.64 LTS), so they're defined twice. Drop
-# bcachefs's copies for a kernel whose headers already have them.
+# bcachefs's copies for a kernel before 6.19 whose headers already have them.
+#
+# workqueue: kernel 7.3.6 renamed the Rust kernel::workqueue::system_unbound() to
+# system_dfl(). Use the new name for a kernel whose Rust crate only has that.
 fix_and_rebuild() {
-    local kver src ver fsh
+    local kver src ver fsh aex rmeta major minor fixed
     src=$(find /usr/src -maxdepth 1 -name 'bcachefs-*' -print -quit)
     [[ -n $src ]] || return 0
     ver=${src##*/bcachefs-}
     fsh=$src/src/fs/bcachefs/vfs/fs.h
+    aex=$src/src/fs/bcachefs/util/async_exec.rs
     for kver in "${kernels[@]}"; do
         modinfo -k "$kver" -F filename bcachefs &>/dev/null && continue
-        if grep -q 'inode_state_set_raw' "/usr/lib/modules/$kver/build/include/linux/fs.h" 2>/dev/null &&
+        IFS=. read -r major minor _ <<<"$kver"
+        rmeta=/usr/lib/modules/$kver/build/rust/libkernel.rmeta
+        fixed=()
+        if (( major < 6 || (major == 6 && minor < 19) )) &&
+            grep -q 'inode_state_set_raw' "/usr/lib/modules/$kver/build/include/linux/fs.h" 2>/dev/null &&
             grep -q '^static inline void inode_state_set_raw' "$fsh" 2>/dev/null; then
-            echo "bcachefs-iso: $kver has the inode_state helpers, rebuilding without bcachefs's copies"
             cp "$fsh" "$fsh.orig"
             sed -i '/^#if LINUX_VERSION_CODE < KERNEL_VERSION(6,19,0)$/{N;/inode_state_read(struct inode \*inode)/s/^#if .*\n/#if 0\n/}' "$fsh"
-            dkms install "bcachefs/$ver" -k "$kver" || true
-            mv "$fsh.orig" "$fsh"
+            fixed+=("$fsh")
         fi
+        if [[ -f $rmeta ]] && ! grep -qa 'system_unbound' "$rmeta" && grep -qa 'system_dfl' "$rmeta" &&
+            grep -q 'kernel::workqueue::system_unbound()' "$aex" 2>/dev/null; then
+            cp "$aex" "$aex.orig"
+            sed -i 's/kernel::workqueue::system_unbound()/kernel::workqueue::system_dfl()/' "$aex"
+            fixed+=("$aex")
+        fi
+        (( ${#fixed[@]} > 0 )) || continue
+        echo "bcachefs-iso: $kver: rebuilding bcachefs with fixes in: ${fixed[*]##*/}"
+        dkms install --force --no-depmod "bcachefs/$ver" -k "$kver" || true
+        for f in "${fixed[@]}"; do mv "$f.orig" "$f"; done
+        depmod "$kver"
     done
 }
 
